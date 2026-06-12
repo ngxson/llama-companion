@@ -154,6 +154,11 @@
         return buildJsonRpcResponse(id, {
           tools: [
             {
+              name: 'current_date',
+              description: 'Current date: ' + new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+              inputSchema: { type: 'object', properties: {}, required: [] },
+            },
+            {
               name: 'get_user_context',
               description: 'Get the live context captured from the user\'s view. ALWAYS call this if you don\'t know anything about the user\'s environment, do not make assumptions. Context may change over time, you may need to call this multiple times during a session.',
               inputSchema: { type: 'object', properties: {}, required: [] },
@@ -185,6 +190,11 @@
 
       case 'tools/call': {
         const toolName = params && params.name;
+        if (toolName === 'current_date') {
+          return buildJsonRpcResponse(id, {
+            content: [{ type: 'text', text: new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) }],
+          });
+        }
         if (toolName === 'get_user_context') {
           // Signal the last-focused screenshotter tab to capture fresh data
           const nonce = Date.now();

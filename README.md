@@ -34,6 +34,7 @@ Enable the server. The script intercepts all requests to that URL - nothing actu
 
 | Tool | Description |
 |------|-------------|
+| `current_date` | Returns the current date in local format. The date is also visible directly in the tool description, so the LLM may not need to call it at all. |
 | `get_user_context` | Signals the last-focused browser tab to capture its content and returns it as markdown. Waits up to 5s for the response. **If multiple tabs are open**, whichever tab was focused most recently before switching to llama-ui is the one that responds. |
 | `web_search` | Opens a background DuckDuckGo tab, waits for the AI summary to appear, captures the results as markdown, then closes the tab. |
 | `get_url` | Fetches the raw content of any URL, bypassing CORS via the userscript layer. |
