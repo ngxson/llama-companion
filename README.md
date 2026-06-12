@@ -7,7 +7,7 @@ All done via a Tampermonkey userscript that gives the web UI a live browser cont
 ## How it works
 
 The script detects which kind of page it is running on and activates one of two modes:
-- **llama.cpp UI mode**: intercepts `fetch()` to expose a fake MCP server at `http://mcp.local/`. This is a in-browser trick, NO external server is required.
+- **llama.cpp UI mode**: intercepts `fetch()` to expose a fake MCP server at `http://mcp.local/`. This is an in-browser trick — NO external server is required. Only activates on local pages (`localhost`, `127.0.0.1`, `*.local`, etc.) for security.
 - **Screenshotter mode**: runs on every other page and captures content into shared userscript storage (`GM_setValue`), making it instantly available to the MCP server.
 
 ## Installation
@@ -30,16 +30,18 @@ http://mcp.local/
 
 Enable the server. The script intercepts all requests to that URL - nothing actually listens on that address.
 
+## MCP tools
+
+| Tool | Description |
+|------|-------------|
+| `get_user_context` | Signals the last-focused browser tab to capture its content and returns it as markdown. Waits up to 5s for the response. **If multiple tabs are open**, whichever tab was focused most recently before switching to llama-ui is the one that responds. |
+| `get_url` | Fetches the raw content of any URL, bypassing CORS via the userscript layer. |
+
 ## Capturing content (screenshotter mode)
 
-On any non-llama.cpp page, two gestures trigger a capture (a blue border glow confirms it ran):
+Content is captured automatically when the LLM calls `get_user_context`. You can also manually capture by selecting ≥ 128 characters of text — a blue border glow confirms it ran.
 
-| Gesture | What is captured |
-|---------|-----------------|
-| **Double-click** anywhere | Full page `innerText` (up to 20 000 chars) |
-| **Select text** (≥ 128 chars) | The selected text only |
-
-The captured content is stored immediately and available to the LLM the next time it calls `get_user_context`.
+Page content is converted to semantic markdown using [`@alloc/dom-to-semantic-markdown`](https://www.npmjs.com/package/@alloc/dom-to-semantic-markdown), loaded lazily from jsDelivr on first capture. Falls back to `innerText` if the CDN is unreachable.
 
 ## Debugging
 
@@ -50,3 +52,8 @@ window.__llama_get_user_context()
 ```
 
 This prints and returns whatever is currently stored in GM storage, independently of the MCP machinery.
+
+## Requirements
+
+- Tampermonkey (Chrome, Firefox, Edge, Safari)
+- llama.cpp built with the web UI (`llama-server --port 8080 ...`)

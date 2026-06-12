@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         llama.cpp UI Injector
-// @version      0.1
+// @version      0.2
 // @namespace    https://github.com/ngxson/llama-companion
 // @homepage     https://github.com/ngxson/llama-companion
 // @license      MIT
@@ -10,6 +10,7 @@
 // @grant        GM_xmlhttpRequest
 // @grant        GM_setValue
 // @grant        GM_getValue
+// @grant        GM_addValueChangeListener
 // @grant        unsafeWindow
 // @run-at       document-start
 // @noframes
@@ -24,6 +25,9 @@
   const MOCK_MCP_SERVER = 'http://mcp.local/';
 
   const MIN_TEXT_SELECT_LENGTH = 128; // Minimum length of text selection to capture
+
+  // Unique ID for this tab instance, used to route MCP capture signals
+  const TAB_ID = Math.random().toString(36).slice(2);
 
   // llama.cpp UI detection
 
@@ -168,6 +172,21 @@
       case 'tools/call': {
         const toolName = params && params.name;
         if (toolName === 'get_user_context') {
+          // Signal the last-focused screenshotter tab to capture fresh data
+          const nonce = Date.now();
+          GM_setValue('contextRequest', nonce);
+
+          // Poll up to 5s for the screenshotter tab to write back
+          await new Promise((resolve) => {
+            const deadline = Date.now() + 5000;
+            const poll = setInterval(() => {
+              if (GM_getValue('contextResponseNonce', 0) === nonce || Date.now() > deadline) {
+                clearInterval(poll);
+                resolve();
+              }
+            }, 100);
+          });
+
           const context = GM_getValue('userContext', '(no context available yet)');
           return buildJsonRpcResponse(id, {
             content: [{ type: 'text', text: context }],
@@ -261,7 +280,7 @@
     return element.innerText || '';
   }
 
-  async function captureAndStore() {
+  async function captureAndStore(nonce = null) {
     if (!document.body) return;
     const md = await elementToText(document.body);
     const context = [
@@ -271,6 +290,8 @@
       md,
     ].join('\n');
     GM_setValue('userContext', context);
+    // Signal completion back to the MCP server poll
+    if (nonce !== null) GM_setValue('contextResponseNonce', nonce);
   }
 
   function flashBorderGlow() {
@@ -278,14 +299,14 @@
     el.style.cssText = [
       'position:fixed', 'inset:0', 'pointer-events:none', 'z-index:2147483647',
       'box-shadow:inset 0 0 0 6px rgba(99,179,237,0.9)',
-      'opacity:1', 'transition:opacity 250ms ease-out',
+      'opacity:1', 'transition:opacity 450ms ease-out',
     ].join(';');
     document.documentElement.appendChild(el);
     // Trigger fade-out on next frame then remove
     requestAnimationFrame(() => {
       requestAnimationFrame(() => { el.style.opacity = '0'; });
     });
-    setTimeout(() => el.remove(), 300);
+    setTimeout(() => el.remove(), 500);
   }
 
   function captureAndStoreSelection(selectedText) {
@@ -300,11 +321,26 @@
   }
 
   function installScreenshotter() {
-    document.addEventListener('dblclick', () => {
-      flashBorderGlow(); // immediate visual feedback; store update is async
-      captureAndStore();
+    // Register this tab as the last-active screenshotter tab now and on every focus.
+    // The MCP signal handler below uses this to decide which tab should respond.
+    // When the user switches from this tab to llama-ui, this tab's ID remains
+    // stored — so the MCP capture signal correctly targets it.
+    const registerAsActive = () => GM_setValue('lastActiveTab', TAB_ID);
+    registerAsActive();
+    window.addEventListener('focus', registerAsActive);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) registerAsActive();
     });
 
+    // React to MCP-triggered capture requests
+    GM_addValueChangeListener('contextRequest', async (_name, _oldVal, newVal, remote) => {
+      if (!remote) return; // ignore writes from this same tab
+      if (GM_getValue('lastActiveTab') !== TAB_ID) return; // not our turn
+      flashBorderGlow();
+      await captureAndStore(newVal); // newVal is the nonce
+    });
+
+    // Manual capture via text selection
     document.addEventListener('mouseup', () => {
       const sel = window.getSelection();
       const text = sel ? sel.toString() : '';
@@ -314,7 +350,7 @@
       }
     });
 
-    console.log('[llama-companion] Screenshotter active on', location.href, '— double-click or select text to capture');
+    console.log('[llama-companion] Screenshotter active on', location.href, '— double-click or select ≥128 chars to capture');
   }
 
   // Entry point
@@ -327,8 +363,17 @@
     }
   }
 
+  function isLocalPage() {
+    const h = location.hostname;
+    return h === 'localhost'
+      || h === '127.0.0.1'
+      || h === '::1'
+      || h.endsWith('.local')
+      || h.endsWith('.localhost');
+  }
+
   onDOMReady(async () => {
-    if (await isLlamaCppUI()) {
+    if (isLocalPage() && await isLlamaCppUI()) {
       installMCPServerInterceptor();
     } else {
       installScreenshotter();
