@@ -1,6 +1,9 @@
 // ==UserScript==
 // @name         llama.cpp UI Injector
 // @version      0.1
+// @namespace    https://github.com/ngxson/llama-companion
+// @homepage     https://github.com/ngxson/llama-companion
+// @license      MIT
 // @description  Acts as data source for llama-server web UI
 // @author       ngxson
 // @match        *://*/*
@@ -10,6 +13,8 @@
 // @grant        unsafeWindow
 // @run-at       document-start
 // @noframes
+// @updateURL    https://raw.githubusercontent.com/ngxson/llama-companion/refs/heads/main/llama-companion.user.js
+// @downloadURL  https://raw.githubusercontent.com/ngxson/llama-companion/refs/heads/main/llama-companion.user.js
 // ==/UserScript==
 
 (function () {

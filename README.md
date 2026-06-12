@@ -12,9 +12,13 @@ The script detects which kind of page it is running on and activates one of two 
 
 ## Installation
 
-1. Install [Tampermonkey](https://www.tampermonkey.net/) for your browser.
-2. Create a new userscript and paste the contents of [script.js](script.js).
-3. Save and enable the script.
+Install [Tampermonkey](https://www.tampermonkey.net/) for your browser.
+
+Then, click on this link to trigger the installation: https://raw.githubusercontent.com/ngxson/llama-companion/refs/heads/main/llama-companion.user.js
+
+Alternatively:
+- Create a new userscript and paste the contents of [llama-companion.user.js](llama-companion.user.js).
+- Save and enable the script.
 
 ## Setup in llama.cpp UI
 
