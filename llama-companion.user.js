@@ -148,12 +148,12 @@
           tools: [
             {
               name: 'get_user_context',
-              description: 'Get the visible text content of the user\'s active browser tab',
+              description: 'Get the live context captured from the user\'s view. ALWAYS call this if you don\'t know anything about the user\'s environment, do not make assumptions. Context may change over time, you may need to call this multiple times during a session.',
               inputSchema: { type: 'object', properties: {}, required: [] },
             },
             {
               name: 'get_url',
-              description: 'Fetch the raw content of any URL. Bypasses CORS via the userscript layer.',
+              description: 'Fetch the raw content of any URL.',
               inputSchema: {
                 type: 'object',
                 properties: {
