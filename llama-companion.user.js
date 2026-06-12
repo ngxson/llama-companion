@@ -237,13 +237,38 @@
 
   // Screenshotter (non-llama.cpp pages)
 
-  function captureAndStore() {
-    const text = (document.body && document.body.innerText) || '';
+  const DOM_TO_MD_CDN = 'https://cdn.jsdelivr.net/npm/@alloc/dom-to-semantic-markdown/+esm';
+  let _domToMdModule = null;
+
+  async function loadDomToMd() {
+    if (_domToMdModule) return _domToMdModule;
+    try {
+      _domToMdModule = await import(DOM_TO_MD_CDN);
+      console.log('[llama-companion] dom-to-semantic-markdown loaded');
+    } catch (e) {
+      console.warn('[llama-companion] failed to load dom-to-semantic-markdown:', e);
+      _domToMdModule = null;
+    }
+    return _domToMdModule;
+  }
+
+  async function elementToText(element) {
+    const mod = await loadDomToMd();
+    if (mod && mod.convertElementToMarkdown) {
+      return mod.convertElementToMarkdown(element);
+    }
+    // Fallback to innerText if CDN load failed
+    return element.innerText || '';
+  }
+
+  async function captureAndStore() {
+    if (!document.body) return;
+    const md = await elementToText(document.body);
     const context = [
       'Title: ' + document.title,
       'URL: ' + location.href,
       '',
-      text.slice(0, 20000),
+      md,
     ].join('\n');
     GM_setValue('userContext', context);
   }
@@ -276,8 +301,8 @@
 
   function installScreenshotter() {
     document.addEventListener('dblclick', () => {
+      flashBorderGlow(); // immediate visual feedback; store update is async
       captureAndStore();
-      flashBorderGlow();
     });
 
     document.addEventListener('mouseup', () => {
