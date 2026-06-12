@@ -35,7 +35,12 @@ Enable the server. The script intercepts all requests to that URL - nothing actu
 | Tool | Description |
 |------|-------------|
 | `get_user_context` | Signals the last-focused browser tab to capture its content and returns it as markdown. Waits up to 5s for the response. **If multiple tabs are open**, whichever tab was focused most recently before switching to llama-ui is the one that responds. |
+| `web_search` | Opens a background DuckDuckGo tab, waits for the AI summary to appear, captures the results as markdown, then closes the tab. |
 | `get_url` | Fetches the raw content of any URL, bypassing CORS via the userscript layer. |
+
+## Web search
+
+`web_search` opens DuckDuckGo in a background tab and polls the page until the AI-generated summary appears (detected by a known marker string). Once found it waits 500ms for rendering to settle, converts the page to markdown, writes the result back, and closes the tab. Times out after 10s if no summary appears.
 
 ## Capturing content (screenshotter mode)
 

@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         llama.cpp UI Injector
-// @version      0.2
+// @version      0.3
 // @namespace    https://github.com/ngxson/llama-companion
 // @homepage     https://github.com/ngxson/llama-companion
 // @license      MIT
@@ -11,6 +11,7 @@
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_addValueChangeListener
+// @grant        GM_openInTab
 // @grant        unsafeWindow
 // @run-at       document-start
 // @noframes
@@ -25,6 +26,8 @@
   const MOCK_MCP_SERVER = 'http://mcp.local/';
 
   const MIN_TEXT_SELECT_LENGTH = 128; // Minimum length of text selection to capture
+
+  const DUCKDUCKGO_AI_MARK = 'Auto-generated based on listed sources. May contain inaccuracies.';
 
   // Unique ID for this tab instance, used to route MCP capture signals
   const TAB_ID = Math.random().toString(36).slice(2);
@@ -156,6 +159,17 @@
               inputSchema: { type: 'object', properties: {}, required: [] },
             },
             {
+              name: 'web_search',
+              description: 'Search the web, use when you are not sure about information or want to get recent news. Do NOT include user\'s personal info in the query.',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  query: { type: 'string', description: 'The search query' },
+                },
+                required: ['query'],
+              },
+            },
+            {
               name: 'get_url',
               description: 'Fetch the raw content of any URL.',
               inputSchema: {
@@ -190,6 +204,30 @@
           const context = GM_getValue('userContext', '(no context available yet)');
           return buildJsonRpcResponse(id, {
             content: [{ type: 'text', text: context }],
+          });
+        }
+        if (toolName === 'web_search') {
+          const query = params && params.arguments && params.arguments.query;
+          if (!query) return buildJsonRpcError(id, -32602, 'Missing required argument: query');
+          const nonce = Date.now();
+          GM_setValue('searchRequest', nonce);
+          const searchUrl = 'https://duckduckgo.com/?q=' + encodeURIComponent(query) + '&assist=true';
+          GM_openInTab(searchUrl, { active: false, insert: true });
+
+          // Wait up to 15s for the search tab to capture and write back
+          await new Promise((resolve) => {
+            const deadline = Date.now() + 15000;
+            const poll = setInterval(() => {
+              if (GM_getValue('searchResponseNonce', 0) === nonce || Date.now() > deadline) {
+                clearInterval(poll);
+                resolve();
+              }
+            }, 200);
+          });
+
+          const result = GM_getValue('searchResult', '(no search results available)');
+          return buildJsonRpcResponse(id, {
+            content: [{ type: 'text', text: result }],
           });
         }
         if (toolName === 'get_url') {
@@ -321,6 +359,41 @@
   }
 
   function installScreenshotter() {
+    // If this tab was opened by the web_search tool, auto-capture and close.
+    const searchNonce = GM_getValue('searchRequest', 0);
+    const searchDone = GM_getValue('searchResponseNonce', 0);
+    const isRecentSearch = searchNonce && searchNonce !== searchDone && (Date.now() - searchNonce) < 30000;
+    if (isRecentSearch) {
+      const doSearchCapture = async () => {
+      // Wait for page load
+      await new Promise(resolve => {
+        if (document.readyState === 'complete') resolve();
+        else window.addEventListener('load', resolve, { once: true });
+      });
+
+      // Poll for the AI summary marker; fall back after 10s if it never appears.
+      await new Promise(resolve => {
+        const deadline = Date.now() + 10000;
+        const check = setInterval(() => {
+          const found = document.body && document.body.innerText.includes(DUCKDUCKGO_AI_MARK);
+          if (found || Date.now() > deadline) {
+            clearInterval(check);
+            setTimeout(resolve, found ? 500 : 0);
+          }
+        }, 200);
+      });
+
+      const md = await elementToText(document.body);
+      const content = ['Title: ' + document.title, 'URL: ' + location.href, '', md].join('\n');
+      GM_setValue('searchResult', content);
+      GM_setValue('searchResponseNonce', searchNonce);
+      window.close();
+    };
+
+      doSearchCapture();
+      return; // skip normal screenshotter setup
+    }
+
     // Register this tab as the last-active screenshotter tab now and on every focus.
     // The MCP signal handler below uses this to decide which tab should respond.
     // When the user switches from this tab to llama-ui, this tab's ID remains
