@@ -41,23 +41,22 @@
     // not a regular <script src>, so check link elements first.
     let bundleUrl = null;
 
+    // Matches plain "bundle.js" and hashed variants like "bundle.DaCibIq9.js"
+    const BUNDLE_RE = /\/bundle(\.[^/.]+)?\.js/;
+
     const preloads = Array.from(document.querySelectorAll('link[rel="modulepreload"]'));
     console.log('[llama-companion] modulepreload links:', preloads.map(l => l.href));
-    const preload = preloads.find(l => l.href && l.href.includes('bundle.js'));
+    const preload = preloads.find(l => l.href && BUNDLE_RE.test(l.href));
     if (preload) {
       bundleUrl = preload.href;
       console.log('[llama-companion] found bundle via modulepreload:', bundleUrl);
     }
 
-    // Fallback: scan raw HTML for any mention of bundle.js
+    // Fallback: scan raw HTML for any bundle reference
     if (!bundleUrl) {
-      const hasInHtml = document.documentElement.innerHTML.includes('bundle.js');
-      console.log('[llama-companion] "bundle.js" in innerHTML:', hasInHtml);
-      if (hasInHtml) {
-        const m = document.documentElement.innerHTML.match(/["'(](\.[^"'()]*bundle\.js[^"'()]*)['")\s]/);
-        console.log('[llama-companion] regex match:', m && m[1]);
-        if (m) bundleUrl = new URL(m[1], location.href).href;
-      }
+      const m = document.documentElement.innerHTML.match(/["'(](\.\/[^"'()]*bundle(?:\.[^"'()/.]+)?\.js[^"'()]*)['")\s]/);
+      console.log('[llama-companion] HTML regex match:', m && m[1]);
+      if (m) bundleUrl = new URL(m[1], location.href).href;
     }
 
     if (!bundleUrl) {
